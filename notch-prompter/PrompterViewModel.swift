@@ -69,12 +69,12 @@ final class PrompterViewModel: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
 
     // MARK: Global keyboard shortcuts
-    private var playPauseHotKey: HotKey?
-    private var showHideHotKey: HotKey?
-    private var increaseSpeedHotKey: HotKey?
-    private var decreaseSpeedHotKey: HotKey?
-    private var scrollUpHotKey: HotKey?
-    private var scrollDownHotKey: HotKey?
+    fileprivate var playPauseHotKey: HotKey?
+    fileprivate var showHideHotKey: HotKey?
+    fileprivate var increaseSpeedHotKey: HotKey?
+    fileprivate var decreaseSpeedHotKey: HotKey?
+    fileprivate var scrollUpHotKey: HotKey?
+    fileprivate var scrollDownHotKey: HotKey?
 
     var audioMonitor: AudioMonitor?
     @Published var showMicrophoneAlert: Bool = false
@@ -115,6 +115,8 @@ final class PrompterViewModel: ObservableObject {
     init() {
         loadSettings()
         observeSettingsChanges()
+        timerCancellable = CADisplayLinkPublisher()
+            .sink { [weak self] t in self?.tick(current: t) }
 //        setupKeyboardShortcuts()
         $voiceActivation
             .removeDuplicates()
@@ -179,10 +181,11 @@ final class PrompterViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] rmsLevel in
                 guard let self = self else { return }
+                guard self.voiceActivation else { return }
                 let detected = rmsLevel > self.audioThreshold
-//                print("Audio monitor - activation: \(detected) rms: \(rmsLevel) threshold: \(self.audioThreshold)")
-                if detected {
+                if detected != self.isPlaying {
                     self.lastTick = nil
+                    self.isPlaying = detected
                 }
 
             }
@@ -195,27 +198,27 @@ final class PrompterViewModel: ObservableObject {
     // MARK: Play/Pause
     func play() {
         lastTick = nil
-        offset = 0
         isPlaying = true
     }
 
     func pause() {
         isPlaying = false
-        offset = 0
+        lastTick = nil
     }
 
     func reset() {
         isPlaying = false
         lastTick = nil
+        offset = 0
     }
 
     func scrollBack() {
-        offset = max(127, offset - backScrollAmount)
+        offset = max(0, offset - backScrollAmount)
     }
 
     // MARK: Manual Scroll Control
     func scrollUp() {
-        offset = max(127, offset - manualScrollAmount)
+        offset = max(0, offset - manualScrollAmount)
     }
 
     func scrollDown() {
@@ -236,9 +239,9 @@ final class PrompterViewModel: ObservableObject {
 
         let dt: CFTimeInterval
         if let last = lastTick {
-            dt = current - last + ((1.0 / 180.0) + current)
+            dt = min(0.1, max(0, current - last))
         } else {
-            dt = -1
+            dt = 0
         }
         lastTick = current
 
@@ -528,5 +531,64 @@ enum PrompterHorizontalAlignment: String, CaseIterable {
         case .center: return "arrow.left.right"
         case .right: return "arrow.right.line"
         }
+    }
+}
+
+// MARK: - PrompterTextAlignment Enum (absent du code public, recréé)
+enum PrompterTextAlignment: String, CaseIterable {
+    case left = "left"
+    case center = "center"
+    case right = "right"
+
+    var displayName: LocalizedStringKey {
+        switch self {
+        case .left: return "Left"
+        case .center: return "Center"
+        case .right: return "Right"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .left: return "text.alignleft"
+        case .center: return "text.aligncenter"
+        case .right: return "text.alignright"
+        }
+    }
+
+    var swiftUIAlignment: TextAlignment {
+        switch self {
+        case .left: return .leading
+        case .center: return .center
+        case .right: return .trailing
+        }
+    }
+}
+
+// MARK: - Global keyboard shortcuts (absents du code public, recréés d'après l'onglet Shortcuts : ⌃⌥)
+extension PrompterViewModel {
+    func registerGlobalKeyboardShortcuts() {
+        unregisterGlobalKeyboardShortcuts()
+        let mods: NSEvent.ModifierFlags = [.control, .option]
+        let make = { (key: Key, action: @escaping () -> Void) -> HotKey in
+            let h = HotKey(key: key, modifiers: mods)
+            h.keyDownHandler = { DispatchQueue.main.async(execute: action) }
+            return h
+        }
+        playPauseHotKey = make(.p) { [weak self] in guard let self else { return }; self.isPlaying ? self.pause() : self.play() }
+        showHideHotKey = make(.h) { [weak self] in self?.isPrompterVisible.toggle() }
+        decreaseSpeedHotKey = make(.leftArrow) { [weak self] in self?.decreaseSpeed() }
+        increaseSpeedHotKey = make(.rightArrow) { [weak self] in self?.increaseSpeed() }
+        scrollUpHotKey = make(.upArrow) { [weak self] in self?.scrollUp() }
+        scrollDownHotKey = make(.downArrow) { [weak self] in self?.scrollDown() }
+    }
+
+    func unregisterGlobalKeyboardShortcuts() {
+        playPauseHotKey = nil
+        showHideHotKey = nil
+        decreaseSpeedHotKey = nil
+        increaseSpeedHotKey = nil
+        scrollUpHotKey = nil
+        scrollDownHotKey = nil
     }
 }

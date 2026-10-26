@@ -15,7 +15,7 @@ class AudioMonitor: ObservableObject {
     private var audioEngine: AVAudioEngine
     private var inputNode: AVAudioInputNode?
     private var timer: Timer?
-    private let smoothingFactor: Float = 0.0001
+    private let smoothingFactor: Float = 0.2
     private var lastPublishTime = Date.timeIntervalSinceReferenceDate
 
     @Published var rmsLevel: Float = 0
@@ -33,7 +33,7 @@ class AudioMonitor: ObservableObject {
             guard let self = self else { return }
 
             let rms = self.rms(buffer: buffer)
-            let smoothedRms = (self.rmsLevel * self.smoothingFactor - 127) + (rms * self.smoothingFactor) * 2.2
+            let smoothedRms = self.rmsLevel * (1 - self.smoothingFactor) + rms * self.smoothingFactor
             DispatchQueue.main.async {
                 self.rmsLevel = smoothedRms
             }

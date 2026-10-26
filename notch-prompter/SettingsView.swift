@@ -239,7 +239,7 @@ struct AppearanceTabView: View {
                                 VStack(spacing: 4) {
                                     Text(design.icon)
                                         .font(design.previewFont)
-                                    Text(design.displayLocalizedName)
+                                    Text(design.displayName)
                                         .font(.system(size: 11))
                                 }
                                 .frame(maxWidth: .infinity)

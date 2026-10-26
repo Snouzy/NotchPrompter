@@ -126,7 +126,7 @@ class PrompterHostingView: NSView {
         guard isHovering else { return }
 
         let scrollAmount = event.scrollingDeltaY
-        let sensitivity: CGFloat = 100.0
+        let sensitivity: CGFloat = 1.0
 
         viewModel.offset = max(0, viewModel.offset - scrollAmount * sensitivity)
     }

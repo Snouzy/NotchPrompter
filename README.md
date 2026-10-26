@@ -1,3 +1,5 @@
+> **Fork personnel (Snouzy) : mode studio.** Ce fork ajoute un mode studio relié à video-studio : le bouton « Lire au prompteur » ouvre `notchprompter://open?server=…&short=…&items=…`, le prompteur affiche les passages Face cam un par un sous l'encoche, filme chaque passage (caméra du Mac ou iPhone) et renvoie la prise au studio avec les temps de chaque essai. Code dans `notch-prompter/Studio/`. Construire : `xcodegen generate` puis `xcodebuild -scheme NotchPrompter test`. Bout à bout : `node scripts/e2e-studio.mjs`. Usage personnel et non commercial, selon la licence d'origine.
+
 
 
 <img width="128" height="128" alt="logo" src="https://github.com/user-attachments/assets/e8429fed-37be-427c-b7ab-ae0ad7537983" />

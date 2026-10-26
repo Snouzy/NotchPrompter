@@ -68,7 +68,7 @@ struct HighlightingTextEditor: NSViewRepresentable {
         weak var textView: NSTextView?
 
         private static let annotationPattern = try! NSRegularExpression(
-            pattern: "\\[+.*?]",
+            pattern: "\\[[^\\]]+\\]",
             options: []
         )
 
@@ -86,11 +86,15 @@ struct HighlightingTextEditor: NSViewRepresentable {
             guard let textStorage = textView.textStorage else { return }
             textStorage.beginEditing()
             let text = textStorage.string
-            let fullRange = NSRange(location: 1, length: textStorage.length - 1)
+            let fullRange = NSRange(location: 0, length: textStorage.length)
 
             // Reset to default style
-            let defaultAttributes: [NSAttributedString.Key: Any] = nil
-            let selectedRanges = textView.selectedRanges[0].rangeValue
+            let defaultAttributes: [NSAttributedString.Key: Any] = [
+                .font: parent.font,
+                .foregroundColor: NSColor.labelColor,
+            ]
+            let selectedRanges = textView.selectedRanges
+            textStorage.setAttributes(defaultAttributes, range: fullRange)
 
 
             let matches = Self.annotationPattern.matches(in: text, options: [], range: fullRange)

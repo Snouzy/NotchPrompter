@@ -17,7 +17,7 @@ struct NotchPrompterApp: App {
         }
 
         MenuBarExtra {
-            MenuContent(viewModel: appDelegate.viewModel)
+            MenuContent(viewModel: appDelegate.viewModel, studio: appDelegate.studio, camera: appDelegate.studio.camera)
         } label: {
             let image: NSImage = {
                 $0.size.height = 12
@@ -35,6 +35,18 @@ struct NotchPrompterApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let viewModel = PrompterViewModel()
     private var prompterWindow: PrompterWindow!
+    @MainActor lazy var studio = StudioController(prompter: viewModel)
+
+    // Le lien notchprompter:// du studio arrive par Apple Event, même quand l'app vient d'être lancée par ce lien.
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(handleURL(_:reply:)),
+                                                     forEventClass: AEEventClass(kInternetEventClass), andEventID: AEEventID(kAEGetURL))
+    }
+
+    @objc private func handleURL(_ event: NSAppleEventDescriptor, reply: NSAppleEventDescriptor) {
+        guard let raw = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue, let url = URL(string: raw) else { return }
+        MainActor.assumeIsolated { studio.handle(url) }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         prompterWindow = PrompterWindow(viewModel: viewModel)
@@ -44,6 +56,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 struct MenuContent: View {
     @ObservedObject var viewModel: PrompterViewModel
+    @ObservedObject var studio: StudioController
+    @ObservedObject var camera: CameraRecorder
 
 
 
@@ -71,6 +85,30 @@ struct MenuContent: View {
             Label("Reset", systemImage: "arrow.counterclockwise")
         }
 
+
+        Divider()
+
+        // Mode studio : ouvert par « Lire au prompteur » dans le studio vidéo.
+        Section("Mode studio") {
+            if studio.session.active {
+                Button("Fermer le mode studio") { Task { await studio.session.close() } }
+            } else {
+                Text("Ouvre-le depuis le studio : « Lire au prompteur »")
+            }
+            Picker("Caméra", selection: $camera.cameraID) {
+                Text("Automatique (iPhone, sinon Mac)").tag(String?.none)
+                ForEach(camera.cameras) { Text($0.name).tag(Optional($0.id)) }
+            }
+            Picker("Micro", selection: $camera.microphoneID) {
+                Text("Par défaut du Mac").tag(String?.none)
+                ForEach(camera.microphones) { Text($0.name).tag(Optional($0.id)) }
+            }
+            Button("Dossier des prises en attente") {
+                try? FileManager.default.createDirectory(at: StudioController.folder, withIntermediateDirectories: true)
+                NSWorkspace.shared.open(StudioController.folder)
+            }
+        }
+        .onAppear { camera.refreshDevices() }
 
         Divider()
 
